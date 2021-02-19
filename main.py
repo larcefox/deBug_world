@@ -29,14 +29,13 @@ config.read('settings.ini')  # читаем конфиг
 class Environment(object):
  
  
-    def __init__(self, config, width=640, height=480, fps=30):
+    def __init__(self, config, fps=30):
         """Initialize pygame, window, background, font,...
         """
         pygame.init()
         pygame.display.set_caption("deBug World")
-        self.width = width
-        self.height = height
-        #self.height = width // 4
+        self.width = int(config["Resolution"]["WIDTH"])
+        self.height = int(config["Resolution"]["HEIGHT"])
         self.screen = pygame.display.set_mode((self.width, self.height), pygame.DOUBLEBUF)
         self.background = pygame.Surface(self.screen.get_size()).convert()
         self.clock = pygame.time.Clock()
@@ -55,15 +54,7 @@ class Environment(object):
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_UP:
-                        self.frequency += 0.1
-                        mesh = mesh_original * self.frequency
-                    elif event.key == pygame.K_DOWN:
-                        self.frequency -= 0.1
-                        mesh = mesh_original * self.frequency
-                    elif event.key == pygame.K_c:
-                        mesh = mesh_original
+
             milliseconds = self.clock.tick(self.fps)
             self.playtime += milliseconds / 1000.0
             self.draw_text("FPS: {:6.3}{}PLAYTIME: {:6.3} SECONDS".format(
@@ -71,8 +62,8 @@ class Environment(object):
 
             pygame.display.flip()
             self.screen.blit(self.background, (0, 0))
-            self.mesh_load(mesh, self.playtime)
- 
+            self.paint(mesh)
+
         pygame.quit()
  
  
@@ -83,57 +74,93 @@ class Environment(object):
         surface = self.font.render(text, True, (0, 255, 0))
         # // makes integer division in python3
         self.screen.blit(surface, (pos_x - fw, pos_y - fh))
-    
-    def mesh_load(self, matrix, playtime):
 
-        TILEWIDTH = 16  #holds the tile width and height
-        TILEHEIGHT = 16
-        TILEHEIGHT_HALF = TILEHEIGHT /2
-        TILEWIDTH_HALF = TILEWIDTH /2
-
-        bioms = self.load_bioms_from_cfg()
-        for row_nb, row in enumerate(matrix):    #for every row of the map...
-            for col_nb, tile in enumerate(row):    #for every cell of the map...
-                DEEP = 50
-                evaluate = matrix
-                moisture = np.transpose(matrix) # transponse matrix for moisture
-                biom_name = self.mesh_img_chooser(evaluate[row_nb, col_nb], moisture[row_nb, col_nb])
-                tileImage = bioms[biom_name]
-                cart_x = row_nb * TILEWIDTH_HALF
-                cart_y = col_nb * TILEHEIGHT_HALF  
-                iso_x = (cart_x - cart_y) 
-                iso_y = (cart_x + cart_y)/2
-                centered_x = self.screen.get_rect().centerx + iso_x
-                centered_y = self.screen.get_rect().centery/2 + iso_y
-                centered_y = centered_y - (DEEP * evaluate[row_nb, col_nb]) - self.width / 8
-                # self.waving_ocean(playtime, col_nb, evaluate.shape, biom_name, DEEP)
-
-                self.screen.blit(tileImage, (centered_x, centered_y)) #display the actual tile
-    def paint(self): #TODO move all paint objects heare!
+    def paint(self, list_of_surfs): #TODO move all paint objects heare!
         """painting on the surface"""
         #------- try out some pygame draw functions --------
         # pygame.draw.line(Surface, color, start, end, width) 
-        pygame.draw.line(self.background, (0,255,0), (10,10), (50,100))
-        # pygame.draw.rect(Surface, color, Rect, width=0): return Rect
-        pygame.draw.rect(self.background, (0,255,0), (50,50,100,25)) # rect: (x1, y1, width, height)
-        # pygame.draw.circle(Surface, color, pos, radius, width=0): return Rect
-        pygame.draw.circle(self.background, (0,200,0), (200,50), 35)
-        # pygame.draw.polygon(Surface, color, pointlist, width=0): return Rect
-        pygame.draw.polygon(self.background, (0,180,0), ((250,100),(300,0),(350,50)))
-        # pygame.draw.arc(Surface, color, Rect, start_angle, stop_angle, width=1): return Rect
-        pygame.draw.arc(self.background, (0,150,0),(400,10,150,100), 0, 3.14) # radiant instead of grad
-        # ------------------- blitting a Ball --------------
-        # myball = Ball() # creating the Ball object
-        # myball.blit(self.background) # blitting it
-    
-    def load_bioms_from_cfg(self)->list:
-        bioms = {}
-        for i in self.config["Bioms"]:
-            bioms[i] = pygame.image.load(config["Bioms"][i]).convert_alpha()
-        return bioms
-    
-    def mesh_img_chooser(self, e, m):
+        # pygame.draw.line(self.background, (0,255,0), (10,10), (50,100))
+        # blits((source, dest, area), ...)) -> [Rect, ...]
+        # self.screen.blits((tileImage, (centered_x, centered_y)))
+        self.screen.blits(list_of_surfs)
 
+ 
+####
+
+class GameObject(object):
+    def __init__(self, config, TILEWIDTH, TILEHEIGHT):
+        self.config = config
+        self.TILEWIDTH = TILEWIDTH  #holds the tile width and height
+        self.TILEHEIGHT = TILEWIDTH
+        self.TILEHEIGHT_HALF = self.TILEHEIGHT / 2
+        self.TILEWIDTH_HALF = self.TILEWIDTH / 2
+        
+####
+
+class Mesh(GameObject):
+    def __init__(self, config, TILEWIDTH, TILEHEIGHT, evaluate):
+        super().__init__(config, TILEWIDTH, TILEHEIGHT)
+        self.evaluate = evaluate
+        self.screen_x = int(config["Resolution"]["WIDTH"])
+        self.screen_y = int(config["Resolution"]["HEIGHT"])
+        self.bioms_dict = config["Bioms"]
+
+    def __call__(self):
+
+        bioms = self.load_bioms_from_cfg()
+        list_of_surfs = []
+
+        for row_nb, row in enumerate(self.evaluate):    #for every row of the map...
+            for col_nb, tile in enumerate(row):    #for every cell of the map...
+                DEEP = 50
+                moisture = np.transpose(self.evaluate) # transponse matrix for moisture
+                biom_name = self.mesh_img_chooser(self.evaluate[row_nb, col_nb], moisture[row_nb, col_nb])
+                tileImage = bioms[biom_name]
+                cart_x = row_nb * self.TILEWIDTH_HALF
+                cart_y = col_nb * self.TILEHEIGHT_HALF  
+                iso_x = (cart_x - cart_y) 
+                iso_y = (cart_x + cart_y)/2
+                centered_x = self.screen_x/2 + iso_x
+                centered_y = self.screen_y/4 + iso_y
+                centered_y = centered_y - (DEEP * self.evaluate[row_nb, col_nb]) - self.screen_x / 8
+                # self.waving_ocean(playtime, col_nb, self.evaluate.shape, biom_name, DEEP) # waving ocean
+                list_of_surfs.append((tileImage, (centered_x, centered_y)))
+
+        return list_of_surfs
+
+    # def waving_ocean(self, playtime, col_nb, mesh_shape, biom_name, deep):
+    #     WAVE_HEIGHT = deep / 5
+    #     wave_fraq = 100
+    #     playtime = playtime * 10
+    #     wave_num = int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq))
+    #     PREV_WAVE = wave_num - 1
+    #     NEXT_WAVE = wave_num + 1
+
+    #     if biom_name == 'ocean':
+    #         if int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == col_nb:
+    #             return WAVE_HEIGHT
+    #         elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb + 1) and \
+    #             col_nb < mesh_shape[0]:
+    #             return WAVE_HEIGHT/2
+    #         elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb - 1) and \
+    #             col_nb > 0:
+    #             return WAVE_HEIGHT/2
+
+    #         elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb + 2) and \
+    #             col_nb < mesh_shape[0]-1:
+    #             return WAVE_HEIGHT/3
+    #         elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb - 2) and \
+    #             col_nb > 1:
+    #             return WAVE_HEIGHT/3
+    #     return 0    
+
+    def load_bioms_from_cfg(self):
+        bioms = {}
+        for i in self.bioms_dict:
+            bioms[i] = pygame.image.load(self.bioms_dict[i]).convert_alpha()
+        return bioms
+
+    def mesh_img_chooser(self, e, m):
         if (e < 0.1):
             return 'ocean'
 
@@ -171,47 +198,10 @@ class Environment(object):
 
         return 'tropical_rain_forest'
 
-
-
-    def waving_ocean(self, playtime, col_nb, mesh_shape, biom_name, deep):
-        WAVE_HEIGHT = deep / 5
-        wave_fraq = 100
-        playtime = playtime * 10
-        wave_num = int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq))
-        PREV_WAVE = wave_num - 1
-        NEXT_WAVE = wave_num + 1
-
-        if biom_name == 'ocean':
-            if int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == col_nb:
-                return WAVE_HEIGHT
-            elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb + 1) and \
-                col_nb < mesh_shape[0]:
-                return WAVE_HEIGHT/2
-            elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb - 1) and \
-                col_nb > 0:
-                return WAVE_HEIGHT/2
-
-            elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb + 2) and \
-                col_nb < mesh_shape[0]-1:
-                return WAVE_HEIGHT/3
-            elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb - 2) and \
-                col_nb > 1:
-                return WAVE_HEIGHT/3
-            
-
-        return 0     
-
- 
-####
-
-class GameObject(object):
-    def __init__(self, TILEWIDTH, TILEHEIGHT):
-        self.TILEWIDTH = 16  #holds the tile width and height
-        self.TILEHEIGHT = 16
-        
 ####
 
 class MatrixGenerator(object):
+    
         def __init__(self, width, height, power=1, frequency=1, move=1):
             '''Main class for all game meshes
             '''
@@ -231,6 +221,7 @@ class MatrixGenerator(object):
 if __name__ == '__main__':
  
     # call with width of window and fps
-    game = Environment(config, 1200, 800)
-    mesh = MatrixGenerator(100, 100)
+    game = Environment(config)
+    matrix = MatrixGenerator(100, 100)
+    mesh = Mesh(config, 16, 16, matrix())
     game.run(mesh())
