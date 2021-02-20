@@ -50,7 +50,6 @@ class Environment(object):
         self.playtime = 0.0
         self.font = pygame.font.SysFont('mono', 10, bold=True)
         self.config = config
-        self.frequency = 1
  
     def run(self, mesh):
         """The mainloop
@@ -61,6 +60,9 @@ class Environment(object):
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RIGHT:
+                        pass
 
             milliseconds = self.clock.tick(self.fps)
             self.playtime += milliseconds / 1000.0
@@ -121,7 +123,9 @@ class Mesh(GameObject):
             for col_nb, tile in enumerate(row):    #for every cell of the map...
                 DEEP = int(config["MeshParam"]["MAX_DEEP"])
                 moisture = np.transpose(self.evaluate) # transponse matrix for moisture
+                #TODO add using sprites and group of sprites
                 biom_name = self.mesh_img_chooser(self.evaluate[row_nb, col_nb], moisture[row_nb, col_nb])
+
                 tileImage = bioms[biom_name]
                 cart_x = row_nb * self.TILEWIDTH_HALF
                 cart_y = col_nb * self.TILEHEIGHT_HALF  
