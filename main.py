@@ -18,7 +18,14 @@ import pygame
 from perlin_noise import PerlinNoise
 import configparser
 import numpy as np
- 
+from loguru import logger
+import sys
+
+
+####
+
+logger.add("log_file.log", colorize=True, format="{time} {level} <green>{message}</green>", level="INFO", rotation="5 MB")
+
 ####
  
 config = configparser.ConfigParser()  # создаём объекта парсера
@@ -162,6 +169,7 @@ class Mesh(GameObject):
 
     def mesh_img_chooser(self, e, m):
         if (e < 0.1):
+            logger.info(f"Eval: {e}, mois: {m}, ocean")
             return 'ocean'
 
         elif (e > 0.8):
