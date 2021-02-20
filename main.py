@@ -95,22 +95,22 @@ class Environment(object):
 ####
 
 class GameObject(object):
-    def __init__(self, config, TILEWIDTH, TILEHEIGHT):
+    def __init__(self, config):
         self.config = config
-        self.TILEWIDTH = TILEWIDTH  #holds the tile width and height
-        self.TILEHEIGHT = TILEWIDTH
+        self.TILEWIDTH = int(config["TILESIZE"]["TILEWIDTH"])  #holds the tile width and height
+        self.TILEHEIGHT = int(config["TILESIZE"]["TILEHEIGHT"])
         self.TILEHEIGHT_HALF = self.TILEHEIGHT / 2
         self.TILEWIDTH_HALF = self.TILEWIDTH / 2
         
 ####
 
 class Mesh(GameObject):
-    def __init__(self, config, TILEWIDTH, TILEHEIGHT, evaluate):
-        super().__init__(config, TILEWIDTH, TILEHEIGHT)
+    def __init__(self, config, evaluate):
+        super().__init__(config)
         self.evaluate = evaluate
         self.screen_x = int(config["Resolution"]["WIDTH"])
         self.screen_y = int(config["Resolution"]["HEIGHT"])
-        self.bioms_dict = config["Bioms"]
+        self.bioms_dict = config[f"Bioms_{config['TILESIZE']['TILEWIDTH']}x{config['TILESIZE']['TILEHEIGHT']}"]
 
     def __call__(self):
 
@@ -119,7 +119,7 @@ class Mesh(GameObject):
 
         for row_nb, row in enumerate(self.evaluate):    #for every row of the map...
             for col_nb, tile in enumerate(row):    #for every cell of the map...
-                DEEP = 50
+                DEEP = int(config["MeshParam"]["MAX_DEEP"])
                 moisture = np.transpose(self.evaluate) # transponse matrix for moisture
                 biom_name = self.mesh_img_chooser(self.evaluate[row_nb, col_nb], moisture[row_nb, col_nb])
                 tileImage = bioms[biom_name]
@@ -165,11 +165,12 @@ class Mesh(GameObject):
         bioms = {}
         for i in self.bioms_dict:
             bioms[i] = pygame.image.load(self.bioms_dict[i]).convert_alpha()
+            #logger.info(bioms[i].get_size())
         return bioms
 
     def mesh_img_chooser(self, e, m):
         if (e < 0.1):
-            logger.info(f"Eval: {e}, mois: {m}, ocean")
+            #logger.info(f"Eval: {e}, mois: {m}, ocean")
             return 'ocean'
 
         elif (e > 0.8):
@@ -210,11 +211,11 @@ class Mesh(GameObject):
 
 class MatrixGenerator(object):
     
-        def __init__(self, width, height, power=1, frequency=1, move=1):
+        def __init__(self, config, power=1, frequency=1, move=1):
             '''Main class for all game meshes
             '''
-            self.width = width
-            self.height = height
+            self.width = int(config['MeshParam']['WIDTH'])
+            self.height = int(config['MeshParam']['HEIGHT'])
             self.power = power
             self.frequency = frequency
             self.move = move
@@ -230,6 +231,6 @@ if __name__ == '__main__':
  
     # call with width of window and fps
     game = Environment(config)
-    matrix = MatrixGenerator(100, 100)
-    mesh = Mesh(config, 16, 16, matrix())
+    matrix = MatrixGenerator(config)
+    mesh = Mesh(config, matrix())
     game.run(mesh())
