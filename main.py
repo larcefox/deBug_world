@@ -62,7 +62,11 @@ class Environment(object):
                     running = False
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RIGHT:
-                        pass
+                        mesh.freq_up()
+                    if event.key == pygame.K_LEFT:
+                        mesh.freq_down()
+                    if event.key == pygame.K_r:
+                        mesh.freq_reset()
 
             milliseconds = self.clock.tick(self.fps)
             self.playtime += milliseconds / 1000.0
@@ -71,7 +75,7 @@ class Environment(object):
 
             pygame.display.flip()
             self.screen.blit(self.background, (0, 0))
-            self.paint(mesh)
+            self.paint(mesh(self.playtime))
 
         pygame.quit()
  
@@ -109,12 +113,14 @@ class GameObject(object):
 class Mesh(GameObject):
     def __init__(self, config, evaluate):
         super().__init__(config)
+        self.freq = 1
         self.evaluate = evaluate
+        self.original_eval = evaluate
         self.screen_x = int(config["Resolution"]["WIDTH"])
         self.screen_y = int(config["Resolution"]["HEIGHT"])
         self.bioms_dict = config[f"Bioms_{config['TILESIZE']['TILEWIDTH']}x{config['TILESIZE']['TILEHEIGHT']}"]
 
-    def __call__(self):
+    def __call__(self, playtime):
 
         bioms = self.load_bioms_from_cfg()
         list_of_surfs = []
@@ -133,37 +139,37 @@ class Mesh(GameObject):
                 iso_y = (cart_x + cart_y)/2
                 centered_x = self.screen_x/2 + iso_x
                 centered_y = self.screen_y/4 + iso_y
-                centered_y = centered_y - (DEEP * self.evaluate[row_nb, col_nb]) - self.screen_x / 8
-                # self.waving_ocean(playtime, col_nb, self.evaluate.shape, biom_name, DEEP) # waving ocean
+                centered_y = centered_y - (DEEP * self.evaluate[row_nb, col_nb]) - self.screen_x / 8 - self.waving_ocean(playtime, col_nb, self.evaluate.shape, biom_name, DEEP) # waving ocean
                 list_of_surfs.append((tileImage, (centered_x, centered_y)))
 
         return list_of_surfs
 
-    # def waving_ocean(self, playtime, col_nb, mesh_shape, biom_name, deep):
-    #     WAVE_HEIGHT = deep / 5
-    #     wave_fraq = 100
-    #     playtime = playtime * 10
-    #     wave_num = int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq))
-    #     PREV_WAVE = wave_num - 1
-    #     NEXT_WAVE = wave_num + 1
+    def waving_ocean(self, playtime, col_nb, mesh_shape, biom_name, deep):
+        WAVE_HEIGHT = deep / 5
+        wave_fraq = 100
+        playtime = playtime * 10
+        wave_num = int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq))
+        PREV_WAVE = wave_num - 1
+        NEXT_WAVE = wave_num + 1
 
-    #     if biom_name == 'ocean':
-    #         if int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == col_nb:
-    #             return WAVE_HEIGHT
-    #         elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb + 1) and \
-    #             col_nb < mesh_shape[0]:
-    #             return WAVE_HEIGHT/2
-    #         elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb - 1) and \
-    #             col_nb > 0:
-    #             return WAVE_HEIGHT/2
+        if biom_name == 'ocean':
+            if int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == col_nb:
+                return WAVE_HEIGHT
+            elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb + 1) and \
+                col_nb < mesh_shape[0]:
+                return WAVE_HEIGHT/2
+            elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb - 1) and \
+                col_nb > 0:
+                return WAVE_HEIGHT/2
 
-    #         elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb + 2) and \
-    #             col_nb < mesh_shape[0]-1:
-    #             return WAVE_HEIGHT/3
-    #         elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb - 2) and \
-    #             col_nb > 1:
-    #             return WAVE_HEIGHT/3
-    #     return 0    
+            elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb + 2) and \
+                col_nb < mesh_shape[0]-1:
+                return WAVE_HEIGHT/3
+            elif int((mesh_shape[0]/wave_fraq) * (playtime % wave_fraq)) == (col_nb - 2) and \
+                col_nb > 1:
+                return WAVE_HEIGHT/3
+        return 0    
+
 
     def load_bioms_from_cfg(self):
         bioms = {}
@@ -211,6 +217,19 @@ class Mesh(GameObject):
 
         return 'tropical_rain_forest'
 
+    def freq_up(self):
+        self.freq += 0.1
+        self.evaluate = self.original_eval * self.freq
+
+    def freq_down(self):
+        self.freq -= 0.1
+        self.evaluate = self.original_eval * self.freq
+
+    def freq_reset(self):
+        self.freq = 1
+        self.evaluate = self.original_eval
+
+
 ####
 
 class MatrixGenerator(object):
@@ -237,4 +256,4 @@ if __name__ == '__main__':
     game = Environment(config)
     matrix = MatrixGenerator(config)
     mesh = Mesh(config, matrix())
-    game.run(mesh())
+    game.run(mesh)

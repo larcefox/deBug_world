@@ -1,117 +1,166 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+014-sprites.py
+real pygame sprites
+url: http://thepythongamebook.com/en:part2:pygame:step014
+author: horst.jens@spielend-programmieren.at
+licence: gpl, see http://www.gnu.org/licenses/gpl.html
+ 
+Real pygame Sprites moving around. Create more sprites with mouse click.
+Shows collision detection
+loading images from a subfolder called 'data'
+all images files must be in the subfolder 'data'. The subfolder must be inside the
+same folder as the program itself. 
+ 
+works with pyhton3.4 and python2.7
+"""
 import pygame
-from pygame.locals import *
-import sys
-from perlin import perlin_list
-import configparser  # импортируем библиотеку
+import os
+import random
  
-config = configparser.ConfigParser()  # создаём объекта парсера
-config.read('settings.ini')  # читаем конфиг
-
-power = 1
-frequency = 1
-movement = 1
-resolution = width, height = 300, 300
-
-evaluate_original = evaluate = perlin_list(width, height)
-moisture = perlin_list(width, height)
-
-def biome(e, m):
-    if (e < 0.1):
-        return 'ocean'
-
-    if (e > 0.8):
-        if (m < 0.1):
-            return 'scorched'
-        if (m < 0.2):
-            return 'bare'
-        if (m < 0.5):
-            return 'tundra'
-        return 'snow'
-
-    if (e > 0.6):
-        if (m < 0.33):
-            return 'temperate_desert'
-        if (m < 0.66):
-            return 'shrubland'
-        return 'taiga'
-
-    if (e > 0.3):
-        if (m < 0.16):
-            return 'temperate_desert'
-        if (m < 0.50):
-            return 'grassland'
-        if (m < 0.83):
-            return 'temperate_deciduous_forest'
-        return 'temperate_rain_forest'
-
-    if (m < 0.16):
-        return 'subtropical_desert'
-    if (m < 0.33):
-        return 'grassland'
-    if (m < 0.66):
-        return 'tropical_seasonal_forest'
-    return 'tropical_rain_forest'
-
+ 
+pygame.mixer.pre_init(44100, -16, 2, 2048) # setup mixer to avoid sound lag
 pygame.init()
+screen=pygame.display.set_mode((640,480)) # try out larger values and see what happens !
+#winstyle = 0  # |FULLSCREEN # Set the display mode
+BIRDSPEED = 50.0
  
-DISPLAYSURF = pygame.display.set_mode((1100, 700), DOUBLEBUF)    #set the display mode, window title and FPS clock
-pygame.display.set_caption('Map Rendering Demo')
-FPSCLOCK = pygame.time.Clock()
+def write(msg="pygame is cool"):
+    myfont = pygame.font.SysFont("None", 32)
+    mytext = myfont.render(msg, True, (0,0,0))
+    mytext = mytext.convert_alpha()
+    return mytext
  
-map_data = evaluate      #the data for the map expressed as [row[tile]].
+class BirdCatcher(pygame.sprite.Sprite):
+    def __init__(self):
+        pygame.sprite.Sprite.__init__(self, self.groups)
+        self.image = pygame.Surface((100,100)) # created on the fly
+        self.image.set_colorkey((0,0,0)) # black transparent
+        pygame.draw.circle(self.image, (255,0,0), (50,50), 50, 2) # red circle
+        self.image = self.image.convert_alpha()
+        self.rect = self.image.get_rect()
+        self.radius = 50 # for collide check
+    def update(self, seconds):
+        # no need for seconds but the other sprites need it
+        self.rect.center = pygame.mouse.get_pos()
  
-# wall = pygame.image.load('wall.png').convert_alpha()  #load images
-# grass = pygame.image.load('grass.png').convert_alpha()
-
-bioms = {}
-for i in config["Bioms"]:
-    bioms[i] = pygame.image.load(config["Bioms"][i]).convert_alpha()
-    
-
-TILEWIDTH = 64  #holds the tile width and height
-TILEHEIGHT = 64
-TILEHEIGHT_HALF = TILEHEIGHT /2
-TILEWIDTH_HALF = TILEWIDTH /2
  
-def load_surfs(map_data):
-    for row_nb, row in enumerate(map_data):    #for every row of the map...
-        for col_nb, tile in enumerate(row):    #for every cell of the map...
-
-            tileImage = bioms[biome(evaluate[row_nb, col_nb], moisture[row_nb, col_nb])]
-
-            cart_x = row_nb * TILEWIDTH_HALF
-            cart_y = col_nb * TILEHEIGHT_HALF  
-            iso_x = (cart_x - cart_y) 
-            iso_y = (cart_x + cart_y)/2
-            centered_x = DISPLAYSURF.get_rect().centerx + iso_x
-            centered_y = DISPLAYSURF.get_rect().centery/2 + iso_y
-            DISPLAYSURF.blit(tileImage, (centered_x, centered_y)) #display the actual tile
-
-load_surfs(map_data)
-
-while True:
+class Bird(pygame.sprite.Sprite):
+    image=[]  # list of all images
+    # not necessary:
+    birds = {} # a dictionary of all Birds, each Bird has its own number
+    number = 0  
+    def __init__(self, startpos=(50,50), area=screen.get_rect()):
+        pygame.sprite.Sprite.__init__(self, self.groups)
+        self.pos = [0.0,0.0]
+        self.pos[0] = startpos[0]*1.0 # float
+        self.pos[1] = startpos[1]*1.0 # float
+        self.image = Bird.image[0]
+        self.rect = self.image.get_rect()
+        self.area = area # where the sprite is allowed to move
+        self.newspeed()
+        self.catched = False
+        #--- not necessary:
+        self.number = Bird.number # get my personal Birdnumber
+        Bird.number+= 1           # increase the number for next Bird
+        Bird.birds[self.number] = self # store myself into the Bird dictionary
+        #print "my number %i Bird number %i " % (self.number, Bird.number)
+    def newspeed(self):
+        # new birdspeed, but not 0
+        speedrandom = random.choice([-1,1]) # flip a coin
+        self.dx = random.random() * BIRDSPEED * speedrandom + speedrandom 
+        self.dy = random.random() * BIRDSPEED * speedrandom + speedrandom 
+       
+    def update(self, seconds):
+        self.pos[0] += self.dx * seconds
+        self.pos[1] += self.dy * seconds
+        # -- check if out of screen
+        if not self.area.contains(self.rect):
+            self.image = Bird.image[1] # crash into wall
+            # --- compare self.rect and area.rect
+            if self.pos[0] + self.rect.width/2 > self.area.right:
+                self.pos[0] = self.area.right - self.rect.width/2
+            if self.pos[0] - self.rect.width/2 < self.area.left:
+                self.pos[0] = self.area.left + self.rect.width/2
+            if self.pos[1] + self.rect.height/2 > self.area.bottom:
+                self.pos[1] = self.area.bottom - self.rect.height/2
+            if self.pos[1] - self.rect.height/2 < self.area.top:
+                self.pos[1] = self.area.top + self.rect.height/2
+            self.newspeed() # calculate a new direction
+        else:
+            if self.catched:
+                self.image = Bird.image[2] # blue rectangle
+            else:
+                self.image = Bird.image[0] # normal bird image
+        #--- calculate new position on screen -----
+             
+        self.rect.centerx = round(self.pos[0],0)
+        self.rect.centery = round(self.pos[1],0)
+ 
+ 
+     
+background = pygame.Surface((screen.get_width(), screen.get_height()))
+background.fill((255,255,255))     # fill white
+background.blit(write("Press left mouse button for more sprites. Press ESC to quit"),(5,10))
+background = background.convert()  # jpg can not have transparency
+screen.blit(background, (0,0))     # blit background on screen (overwriting all)
+clock = pygame.time.Clock()        # create pygame clock object 
+mainloop = True
+FPS = 60                           # desired max. framerate in frames per second. 
+ 
+# load images into classes (class variable !)
+try:
+    Bird.image.append(pygame.image.load(os.path.join("data","babytux.png")))
+    Bird.image.append(pygame.image.load(os.path.join("data","babytux_neg.png")))
+except:
+    raise( UserWarning, "Unable to find babytux images in the folder 'data' :-( ")
+Bird.image.append(Bird.image[0].copy()) # copy of first image
+pygame.draw.rect(Bird.image[2], (0,0,255), (0,0,32,36), 1) # blue border
+Bird.image[0] = Bird.image[0].convert_alpha()
+Bird.image[1] = Bird.image[1].convert_alpha()
+Bird.image[2] = Bird.image[2].convert_alpha()
+ 
+birdgroup = pygame.sprite.Group()
+allgroup = pygame.sprite.Group()
+         
+#assign default groups to each sprite class
+Bird.groups = birdgroup, allgroup
+BirdCatcher.groups = allgroup
+# one single Bird
+Bird()
+# display the BirdCatcher and name it "hunter"
+hunter = BirdCatcher() 
+ 
+while mainloop:
+    milliseconds = clock.tick(FPS)  # milliseconds passed since last frame
+    seconds = milliseconds / 1000.0 # seconds passed since last frame
     for event in pygame.event.get():
-        if event.type == QUIT:
-            pygame.quit()
-            sys.exit()
-        if event.type == KEYUP:
-            if event.key == K_ESCAPE:
-                pygame.quit()
-                sys.exit()
-            if event.key == pygame.K_LEFT:
-                power += 0.1
-                evaluate = evaluate_original ** power                
-            if event.key == pygame.K_RIGHT:
-                power -= 0.1
-                evaluate = evaluate_original ** power
-            if event.key == pygame.K_UP:
-                frequency += 0.1
-                evaluate = evaluate_original * frequency
-            if event.key == pygame.K_DOWN:
-                frequency -= 0.1
-                evaluate = evaluate_original * frequency
-            if event.key == pygame.K_c:
-                evaluate = evaluate_original
-                
-    pygame.display.flip()
-    FPSCLOCK.tick(30)
+        if event.type == pygame.QUIT:
+            mainloop = False # pygame window closed by user
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                mainloop = False # user pressed ESC
+    # create new Bird on mouseclick
+    if pygame.mouse.get_pressed()[0]:
+        Bird(pygame.mouse.get_pos()) # create a new Bird at mousepos
+     
+    pygame.display.set_caption("[FPS]: %.2f birds: %i" % (clock.get_fps(), len(birdgroup)))
+     
+    # ------ collision detecttion
+    for bird in birdgroup:
+        bird.catched = False   # set all Bird sprites to not catched
+         
+    #pygame.sprite.spritecollide(sprite, group, dokill, collided = None): return Sprite_list
+    crashgroup = pygame.sprite.spritecollide(hunter, birdgroup, False, pygame.sprite.collide_circle)
+    # pygame.sprite.collide_circle works only if one sprite has self.radius
+    # you can do without that argument collided and only the self.rects will be checked
+    for crashbird in crashgroup:
+        crashbird.catched = True # will get a blue border from Bird.update()
+        #crashbird.kill()   # this would remove him from all his groups
+         
+    allgroup.clear(screen, background)
+    allgroup.update(seconds)
+    allgroup.draw(screen)
+     
+    pygame.display.flip()          # flip the screen 30 times a second    
