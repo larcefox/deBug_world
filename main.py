@@ -53,7 +53,7 @@ class Environment(object):
 
     def run(self, mesh):
         """The mainloop"""
-        mesh_sprite_group = mesh.get_group()
+        mesh_sprite_groups = mesh.get_group()
         running = True
         while running:
             for event in pygame.event.get():
@@ -62,13 +62,13 @@ class Environment(object):
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RIGHT:
                         mesh.freq_up()
-                        mesh_sprite_group = mesh.get_group()
+                        mesh_sprite_groups = mesh.get_group()
                     if event.key == pygame.K_LEFT:
                         mesh.freq_down()
-                        mesh_sprite_group = mesh.get_group()
+                        mesh_sprite_groups = mesh.get_group()
                     if event.key == pygame.K_r:
                         mesh.freq_reset()
-                        mesh_sprite_group = mesh.get_group()
+                        mesh_sprite_groups = mesh.get_group()
 
             milliseconds = self.clock.tick(self.fps)
             self.playtime += milliseconds / 1000.0
@@ -82,7 +82,7 @@ class Environment(object):
 
             pygame.display.flip()
             self.screen.blit(self.background, (0, 0))
-            mesh_sprite_group.draw(self.screen)
+            [mesh_sprite_groups[i].draw(self.screen) for i in mesh_sprite_groups]
 
         pygame.quit()
 
@@ -116,29 +116,26 @@ class MeshSpriteGroup():
         self.TILEHEIGHT = int(config["TILESIZE"]["TILEHEIGHT"])
         self.TILEHEIGHT_HALF = self.TILEHEIGHT / 2
         self.TILEWIDTH_HALF = self.TILEWIDTH / 2
-        self.freq = 1
-        self.evaluate = evaluate
-        self.original_eval = evaluate
+        self.freq = 1 # level of hight
+        self.evaluate = evaluate # eval matrix
+        self.original_eval = evaluate # seve original eval matrix
         self.screen_x = int(config["SCREEN"]["WIDTH"])
         self.screen_y = int(config["SCREEN"]["HEIGHT"])
         self.bioms_dict = config[
             f"Bioms_{config['TILESIZE']['TILEWIDTH']}x{config['TILESIZE']['TILEHEIGHT']}"
         ]
-        self.sprite_group = pygame.sprite.Group()
-
+        self.moisture = np.transpose(self.evaluate)  # transponse matrix for moisture
+        self.DEEP = int(config["MeshParam"]["MAX_DEEP"])
+        self.sprite_groups_dict = {i:pygame.sprite.Group() for i in config[f"Bioms_{config['TILESIZE']['TILEWIDTH']}x{config['TILESIZE']['TILEHEIGHT']}"]}
+        
     def get_group(self):
-
-        moisture = np.transpose(self.evaluate)  # transponse matrix for moisture
-        DEEP = int(config["MeshParam"]["MAX_DEEP"])
-        self.sprite_group.empty()
+        [pygame.sprite.Group.empty(self.sprite_groups_dict[i]) for i in self.sprite_groups_dict]
+        
         for row_nb, row in enumerate(self.evaluate):  # for every row of the map...
             for col_nb, tile in enumerate(row):  # for every cell of the map...
-                
-                
                 biom_name = self.mesh_img_chooser(
-                    self.evaluate[row_nb, col_nb], moisture[row_nb, col_nb]
+                    self.evaluate[row_nb, col_nb], self.moisture[row_nb, col_nb]
                 )
-
                 filename = self.bioms_dict[biom_name]
                 cart_x = row_nb * self.TILEWIDTH_HALF
                 cart_y = col_nb * self.TILEHEIGHT_HALF
@@ -148,11 +145,13 @@ class MeshSpriteGroup():
                 pos_y = self.screen_y / 4 + iso_y
                 pos_y = (
                     pos_y
-                    - (DEEP * self.evaluate[row_nb, col_nb])
+                    - (self.DEEP * self.evaluate[row_nb, col_nb])
                     - self.screen_x / 8)
-                self.sprite_group.add(ConcreteSpriteFactory.create_mesh(filename, pos_x, pos_y))
-                
-        return self.sprite_group
+
+                self.sprite_groups_dict[biom_name].add(ConcreteSpriteFactory.create_mesh(filename, pos_x, pos_y))
+                logger.info(self.sprite_groups_dict)
+
+        return self.sprite_groups_dict
 
     def waving_ocean(self, playtime, col_nb, mesh_shape, biom_name, deep):
         WAVE_HEIGHT = deep / 5
