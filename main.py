@@ -50,57 +50,51 @@ class Environment(object):
             config["FONTS"]["OPT"]
             )
         self.config = config
+        self.running = True
+        
+    def control(self, event):
+        if event.type == pygame.QUIT: 
+            self.running = False
+            #logger.info(event)
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RIGHT:
+                mesh.freq_up()
+                mesh_sprite_groups = mesh.get_group()
+            if event.key == pygame.K_LEFT:
+                mesh.freq_down()
+                mesh_sprite_groups = mesh.get_group()
+            if event.key == pygame.K_r:
+                mesh.freq_reset()
+                mesh_sprite_groups = mesh.get_group()
 
-    def run(self, mesh):
+    def run(self, mesh, dict_of_sprite_objects):
         """The mainloop"""
-        mesh_sprite_groups = mesh.get_group()
-        running = True
-        while running:
+        dict_of_sprite_groups = mesh.get_group()
+        while self.running:
             for event in pygame.event.get():
-                if event.type == pygame.QUIT: 
-                    running = False
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RIGHT:
-                        mesh.freq_up()
-                        mesh_sprite_groups = mesh.get_group()
-                    if event.key == pygame.K_LEFT:
-                        mesh.freq_down()
-                        mesh_sprite_groups = mesh.get_group()
-                    if event.key == pygame.K_r:
-                        mesh.freq_reset()
-                        mesh_sprite_groups = mesh.get_group()
-
+                self.control(event)
+                
             milliseconds = self.clock.tick(self.fps)
             self.playtime += milliseconds / 1000.0
-            self.draw_text(
-                "FPS: {:6.3}{}PLAYTIME: {:6.3} SECONDS".format(
-                    self.clock.get_fps(), " " * 5, self.playtime
-                ),
-                (self.width),
-                (self.height),
-            )
+            
+            self.screen.blit(self.background, (0, 0))
+            #self.draw_text("FPS: {:6.3}{}PLAYTIME: {:6.3} SECONDS".format(self.clock.get_fps(), " " * 5, self.playtime), (self.width), (self.height),)
+
+            hwt = dict_so_sprite_objects['text'](
+                "FPS: {:6.3}{}PLAYTIME: {:6.3} SECONDS".format( self.clock.get_fps(), " " * 5, self.playtime),
+                self.width,
+                self.height,
+                size=20
+                )
+            
+            [dict_of_sprite_groups[i].draw(self.screen) for i in dict_of_sprite_groups]
+            self.screen.blit(hwt.image, hwt.rect)
+
+            #mesh_sprite_groups['ocean'].clear(self.screen, self.background)
 
             pygame.display.flip()
-            self.screen.blit(self.background, (0, 0))
-            [mesh_sprite_groups[i].draw(self.screen) for i in mesh_sprite_groups]
 
         pygame.quit()
-
-    def draw_text(self, text, pos_x, pos_y):
-        """Center text in window"""
-        fw, fh = self.font.size(text)  # fw: font width,  fh: font height
-        surface = self.font.render(text, True, (0, 255, 0))
-        # // makes integer division in python3
-        self.screen.blit(surface, (pos_x - fw, pos_y - fh))
-
-    def paint(self, list_of_surfs):  # TODO move all paint objects heare!
-        """painting on the surface"""
-        # ------- try out some pygame draw functions --------
-        # pygame.draw.line(Surface, color, start, end, width)
-        # pygame.draw.line(self.background, (0,255,0), (10,10), (50,100))
-        # blits((source, dest, area), ...)) -> [Rect, ...]
-        # self.screen.blits((tileImage, (centered_x, centered_y)))
-        self.screen.blits(list_of_surfs)
 
 
 ####
@@ -108,7 +102,7 @@ class Environment(object):
 
 class MeshSpriteGroup():
 
-    def __init__(self, config, evaluate):
+    def __init__(self, config):
         self.config = config
         self.TILEWIDTH = int(
             config["TILESIZE"]["TILEWIDTH"]
@@ -117,8 +111,8 @@ class MeshSpriteGroup():
         self.TILEHEIGHT_HALF = self.TILEHEIGHT / 2
         self.TILEWIDTH_HALF = self.TILEWIDTH / 2
         self.freq = 1 # level of hight
-        self.evaluate = evaluate # eval matrix
-        self.original_eval = evaluate # seve original eval matrix
+        self.evaluate = MatrixGenerator(config)() # eval matrix
+        self.original_eval = self.evaluate # seve original eval matrix
         self.screen_x = int(config["SCREEN"]["WIDTH"])
         self.screen_y = int(config["SCREEN"]["HEIGHT"])
         self.bioms_dict = config[
@@ -148,9 +142,8 @@ class MeshSpriteGroup():
                     - (self.DEEP * self.evaluate[row_nb, col_nb])
                     - self.screen_x / 8)
 
-                self.sprite_groups_dict[biom_name].add(ConcreteSpriteFactory.create_mesh(filename, pos_x, pos_y))
-                logger.info(self.sprite_groups_dict)
-
+                self.sprite_groups_dict[biom_name].add(ConcreteSpriteFactory.create_game_sprite(filename, pos_x, pos_y))
+                
         return self.sprite_groups_dict
 
     def waving_ocean(self, playtime, col_nb, mesh_shape, biom_name, deep):
@@ -266,33 +259,11 @@ class MatrixGenerator(object):
             ]
         )
 
-
 ####
 
-class Text(pygame.sprite.Sprite):
-    """ a helper class to write text on the screen """
-    number = 0 
-    book = {}
-    def __init__(self, pos, msg):
-        self.number = Text.number # get a unique number
-        Text.number += 1 # prepare number for next Textsprite
-        Text.book[self.number] = self # store myself into the book
-        pygame.sprite.Sprite.__init__(self, self.groups)
-        self.pos = [0.0,0.0]
-        self.pos[0] = pos[0]
-        self.pos[1] = pos[1]
-        self.msg = msg
-        self.changemsg(msg)
-         
-    def update(self, seconds):        
-        pass
-         
-    def changemsg(self,msg):
-        self.msg = msg
-        self.image = write(self.msg)
-        self.rect = self.image.get_rect()
-        self.rect.centerx = self.pos[0] 
-        self.rect.centery = self.pos[1]
+dict_of_sprite_objects = {
+    'text':ConcreteSpriteFactory.create_text,
+                            }
 
 ####
 
@@ -300,6 +271,5 @@ if __name__ == "__main__":
 
     # call with width of window and fps
     game = Environment(config)
-    matrix = MatrixGenerator(config)
-    mesh = MeshSpriteGroup(config, matrix())
-    game.run(mesh)
+    mesh = MeshSpriteGroup(config)
+    game.run(mesh, dict_of_sprite_objects)
