@@ -17,6 +17,7 @@ License: GPL, see http://www.gnu.org/licenses/gpl.html
 #the next line is only needed for python2.x and not necessary for python3.x
 from __future__ import print_function, division
 import pygame
+import math
  
 # Initialize Pygame.
 pygame.init()
@@ -47,7 +48,7 @@ while mainloop:
     # Do not go faster than this framerate.
     milliseconds = clock.tick(FPS) 
     playtime += milliseconds / 1000.0 
-     
+    
     for event in pygame.event.get():
         # User presses QUIT-button.
         if event.type == pygame.QUIT:
@@ -56,7 +57,7 @@ while mainloop:
             # User presses ESCAPE-Key
             if event.key == pygame.K_ESCAPE:
                 mainloop = False
-                 
+    screen.blit(cube, (0,0))
     # Print framerate and playtime in titlebar.
     text = "FPS: {0:.2f}   Playtime: {1:.2f}".format(clock.get_fps(), playtime)
     pygame.display.set_caption(text)
