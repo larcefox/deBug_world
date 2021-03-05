@@ -1,4 +1,4 @@
-#!/home/larce/Documents/game1/game1_venv python
+#!/home/larce/Documents/game1/game1_venv/bin/python
 
 ####
 
@@ -80,7 +80,7 @@ class Environment(object):
             self.screen.blit(self.background, (0, 0))
             #self.draw_text("FPS: {:6.3}{}PLAYTIME: {:6.3} SECONDS".format(self.clock.get_fps(), " " * 5, self.playtime), (self.width), (self.height),)
 
-            hwt = dict_so_sprite_objects['text'](
+            hwt = dict_of_sprite_objects['text'](
                 "FPS: {:6.3}{}PLAYTIME: {:6.3} SECONDS".format( self.clock.get_fps(), " " * 5, self.playtime),
                 self.width,
                 self.height,
