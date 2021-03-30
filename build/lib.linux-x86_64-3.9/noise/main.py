@@ -15,10 +15,8 @@ from ursina.prefabs.first_person_controller import FirstPersonController
 ####
 
 app = ua.Ursina()
-ua.window.borderless = False               # Show a border
-ua.window.fullscreen = False               # Go Fullscreen
-ua.window.exit_button.visible = False      # Show the in-game red X that loses the window
-ua.window.fps_counter.enabled = True       # Show the FPS (Frames per second) counter
+ua.window.borderless = False
+ua.window.exit_button.visible = False
 ua.window.show_ursina_splash = True
 
 ####
@@ -175,15 +173,15 @@ if __name__ == "__main__":
 
     env = Environment(config)
     env.draw_mesh()
-    # player = FirstPersonController()
-    # player.collider = 'mesh_shape'
-    # player.speed = 15
-    # player.mouse_sensitivity = (5, 5)
-    # player.gravity = 0.1
-    # player.jump_height = 15
+    player = FirstPersonController()
+    player.collider = 'mesh_shape'
+    player.speed = 15
+    player.mouse_sensitivity = (5, 5)
+    player.gravity = 0.1
+    player.jump_height = 15
     # player.position = (30, 120, 30)
     # player.position = ua.Vec3(94, 72, 96)
-    camera = ua.EditorCamera()
+    # camera = ua.EditorCamera()
 
     # ua.Cursor()
     # ua.mouse.visible = False
